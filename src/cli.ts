@@ -53,6 +53,7 @@ if (existsSync(CONFIG_FILE)) {
 const argv: any = yarg.argv;
 const config: GeneratorConfig = {
   input: argv['input'],
+  workingDirectory: argv['dir'],
   exclude: argv['exclude'],
   output: argv['output'],
   highlight: argv['highlight'],

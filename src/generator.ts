@@ -1,4 +1,4 @@
-import { glob } from 'glob';
+import { glob, IOptions } from 'glob';
 import { copyFile, readFile, writeFile } from 'fs/promises';
 import { basename, dirname, join } from 'path';
 import { existsSync, mkdirSync, rmSync } from 'fs';
@@ -8,6 +8,7 @@ import { Parser } from './parser';
 export interface GeneratorConfig {
   input: string;
   exclude: string;
+  workingDirectory: string|undefined;
   output: string;
   highlight: boolean;
   inline: boolean;
@@ -24,28 +25,42 @@ export class Generator {
   }
 
   public async generate(): Promise<void> {
-    const filenames = glob.sync(this.config.input, { ignore: this.config.exclude });
+	  
+    let globOptions : IOptions = { ignore: this.config.exclude };
+    if (this.config.workingDirectory) {
+      globOptions.cwd = this.config.workingDirectory;
+    }
+    const filenames = glob.sync(this.config.input, globOptions);
 
     for (let i = 0; i < filenames.length; i++) {
-      const filename = filenames[i];
-      await this.process(filename);
+      const markdownFilePath = filenames[i];
+      
+      await this.process(markdownFilePath, this.config.workingDirectory);
     }
   }
 
-  private async process(markdownFilePath: string): Promise<void> {
+  private async process(markdownFilePath: string, workingDirectory: string|undefined): Promise<void> {
+    const fullInputPath = (workingDirectory) ? join(workingDirectory, markdownFilePath) : markdownFilePath;
+    let output = this.config.output;
+    if (this.config.workingDirectory) {
+      output = join(this.config.workingDirectory, output);
+    }
 
-    const outputFilepath = this.getOutputFilePath(this.config.output, markdownFilePath);
-    const parseResult = await this.parser.parse(markdownFilePath);
+    const outputFilepath = this.getOutputFilePath(output, markdownFilePath);
+
+    
+    const parseResult = await this.parser.parse(fullInputPath);
     const contentHtml = parseResult.html;
-    const filename = basename(markdownFilePath).replace('.md', '');
+    const filename = basename(fullInputPath).replace('.md', '');
     const html = this.templater.create({ content: contentHtml, filename: filename });
     
     await writeFile(outputFilepath, html);
 
     const filedirectory = dirname(markdownFilePath);
     const fixedImages = parseResult.referencedImages.map(imagePath => join(filedirectory, imagePath));
-    await this.copyImages(fixedImages, this.config.output);
+    await this.copyImages(fixedImages, workingDirectory, output);
   }
+
 
   private getOutputFilePath(outputRoot: string, originalPath: string): string {
 
@@ -70,11 +85,12 @@ export class Generator {
     return outputFilepath;
   }
 
-  private async copyImages(paths: string[], outputDirectory: string) {
+  private async copyImages(paths: string[], workingDirectory: string|undefined, outputDirectory: string) {
     for (let i = 0; i < paths.length; i++) {
-      const path = paths[i];
-      if (!existsSync(path)) {
-        console.warn(`Cannot copy image: '${path}' - file not found`);
+      let path = paths[i];
+      let inputPath = (workingDirectory) ? join(workingDirectory, path) : path;
+      if (!existsSync(inputPath)) {
+        console.warn(`Cannot copy image: '${inputPath}' - file not found`);
         continue;
       }
 
