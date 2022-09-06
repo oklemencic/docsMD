@@ -98,13 +98,18 @@ export class Generator {
       
 
       if (!existsSync(targetPath)) {
-
-        const targetFolder = dirname(targetPath);
-        if (!existsSync(targetFolder)) {
-          mkdirSync(targetFolder, { recursive: true });
-        }
+        this.ensureDirectoryExistence(targetPath);
         await copyFile(inputPath, targetPath);
       }
     }
+  }
+
+  private ensureDirectoryExistence(filePath: string): void {
+    var directoryName = dirname(filePath);
+    if (existsSync(directoryName)) {
+      return;
+    }
+    this.ensureDirectoryExistence(directoryName);
+    mkdirSync(directoryName);
   }
 }
