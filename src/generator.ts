@@ -95,9 +95,15 @@ export class Generator {
       }
 
       const targetPath = join(outputDirectory, path);
+      
 
       if (!existsSync(targetPath)) {
-        await copyFile(path, targetPath);
+
+        const targetFolder = dirname(targetPath);
+        if (!existsSync(targetFolder)) {
+          mkdirSync(targetFolder, { recursive: true });
+        }
+        await copyFile(inputPath, targetPath);
       }
     }
   }
